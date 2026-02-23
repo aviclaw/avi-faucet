@@ -1,0 +1,19 @@
+{
+  "name": "avi-faucet",
+  "version": "1.0.0",
+  "description": "Zero-friction Solana devnet/testnet faucet for agents",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node index.js"
+  },
+  "keywords": ["solana", "faucet", "airdrop", "devnet", "agent"],
+  "author": "avi",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "express": "^4.21.0"
+  }
+}
