@@ -1,72 +1,95 @@
-# 🦞 Avi Faucet
+# Avi Faucet 🦞
 
-Zero-friction Solana devnet/testnet faucet for agents.
+Multi-chain faucet for agents using Coinbase CDP API. Zero friction, fully programmatic.
+
+## Supported Networks & Tokens
+
+| Network | Tokens | Limits |
+|---------|--------|--------|
+| Base Sepolia | ETH, USDC, EURC, cbBTC | ETH: 1000/day, USDC: 10/day |
+| Ethereum Sepolia | ETH | 1000/day |
+| Solana Devnet | SOL | 100/day |
 
 ## Usage
 
 ```bash
-# Install dependencies
+# Install
 npm install
 
-# Start the server
-npm start
+# Configure CDP API key
+export CDP_API_KEY="your-cdp-api-key"
 
-# Or with custom config
-AIRDROP_LAMPORTS=1000000000 RATE_LIMIT_SECS=7200 npm start
+# Start
+npm start
 ```
 
 ## API
 
 ### POST /airdrop
 
-Request airdrop to a Solana address.
-
 ```bash
+# Base Sepolia ETH
 curl -X POST http://localhost:3000/airdrop \
   -H "Content-Type: application/json" \
-  -d '{"address": "YOUR_SOLANA_ADDRESS", "network": "devnet"}'
+  -d '{"address": "0x742d35Cc6634C0532925a3b844Bc9e7595f4bE21", "network": "base-sepolia", "token": "eth"}'
+
+# Solana Devnet SOL
+curl -X POST http://localhost:3000/airdrop \
+  -H "Content-Type: application/json" \
+  -d '{"address": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU", "network": "solana-devnet", "token": "sol"}'
 ```
 
-Response:
-```json
-{
-  "success": true,
-  "tx_signature": "3xXx...",
-  "message": "Airdropped 5 SOL to YOUR_ADDRESS",
-  "lamports": 5000000000
-}
+### GET /networks
+
+```bash
+curl http://localhost:3000/networks
 ```
 
 ### GET /status
-
-Get network status.
 
 ```bash
 curl http://localhost:3000/status
 ```
 
-## Environment Variables
+## Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AIRDROP_LAMPORTS` | 5000000000 | Airdrop amount in lamports (5 SOL) |
-| `RATE_LIMIT_SECS` | 3600 | Rate limit per address in seconds |
+| `CDP_API_KEY` | - | **Required** - Get free at portal.cdp.coinbase.com |
+| `RATE_LIMIT_SECS` | 3600 | Local rate limit per address |
 | `PORT` | 3000 | Server port |
+
+## Get CDP API Key
+
+1. Go to [portal.cdp.coinbase.com](https://portal.cdp.coinbase.com)
+2. Sign up for free (email verification only)
+3. Create an API key
+4. Set `CDP_API_KEY` environment variable
+
+## Examples
+
+```javascript
+// Node.js
+const axios = require('axios');
+
+await axios.post('http://localhost:3000/airdrop', {
+  address: '0x742d35Cc6634C0532925a3b844Bc9e7595f4bE21',
+  network: 'base-sepolia',
+  token: 'eth'
+});
+```
 
 ## Architecture
 
 - **Zero CAPTCHA** - Fully programmatic
-- **Rate limiting** - In-memory per-address
-- **Multi-network** - devnet + testnet support
+- **Multi-chain** - EVM + Solana
+- **Rate limiting** - In-memory per address/network/token
+- **CDP-backed** - Reliable, no self-funding required
 
 ## Tier 1: Zero Friction
 
-This faucet follows the gold standard:
-
-```bash
-solana airdrop 2
-```
-
-Via web3.js: `connection.requestAirdrop(pubkey, lamports)`
-
-This service wraps `requestAirdrop()` in Express for agent-friendly HTTP API.
+This faucet achieves the gold standard:
+- ✅ No CAPTCHA
+- ✅ No signup (for users - just need wallet address)
+- ✅ Fully programmatic via HTTP API
+- ✅ Multiple chains, multiple tokens

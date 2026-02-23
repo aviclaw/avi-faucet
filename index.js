@@ -1,5 +1,4 @@
 const express = require('express');
-const axios = require('axios');
 const cors = require('cors');
 require('dotenv').config();
 
@@ -11,50 +10,109 @@ app.use(cors());
 const rateLimit = new Map();
 
 // Config
-const AIRDROP_LAMPORTS = parseInt(process.env.AIRDROP_LAMPORTS || '5000000000'); // 5 SOL
+const CDP_API_KEY = process.env.CDP_API_KEY;
 const RATE_LIMIT_SECS = parseInt(process.env.RATE_LIMIT_SECS || '3600');
 const PORT = process.env.PORT || 3000;
 
+// Supported networks and tokens
 const NETWORKS = {
-  devnet: 'https://api.devnet.solana.com',
-  testnet: 'https://api.testnet.solana.com',
+  'base-sepolia': { chain: 'base', network: 'base-sepolia' },
+  'ethereum-sepolia': { chain: 'eth', network: 'eth-mainnet' }, // Actually uses "eth-mainnet" in CDP for Sepolia
+  'solana-devnet': { chain: 'sol', network: 'solana-devnet' },
 };
 
-// Validate Solana address (basic base58)
-function isValidSolanaAddress(address) {
-  if (!address || address.length < 32 || address.length > 44) return false;
-  const base58Regex = /^[1-9A-HJ-NP-Za-km-z]+$/;
-  return base58Regex.test(address);
+const TOKENS = ['eth', 'usdc', 'eurc', 'cbbtc', 'sol'];
+
+// Token info: [claims/day, amount per claim]
+const TOKEN_LIMITS = {
+  eth: { daily: 1000, amount: '0.0001 ETH' },
+  usdc: { daily: 10, amount: '1 USDC' },
+  eurc: { daily: 10, amount: '1 EURC' },
+  cbbtc: { daily: 100, amount: '0.000001 cbBTC' },
+  sol: { daily: 100, amount: '0.5 SOL' },
+};
+
+// Validate address by chain type
+function validateAddress(address, chain) {
+  if (!address) return false;
+  
+  if (chain === 'sol') {
+    // Solana: base58, 32-44 chars
+    return address.length >= 32 && address.length <= 44 && 
+           /^[1-9A-HJ-NP-Za-km-z]+$/.test(address);
+  } else {
+    // EVM: 0x + 40 hex chars
+    return /^0x[a-fA-F0-9]{40}$/.test(address);
+  }
 }
 
-// RPC helper
-async function solanaRpc(method, params, network = 'devnet') {
-  const url = NETWORKS[network] || NETWORKS.devnet;
-  const response = await axios.post(url, {
-    jsonrpc: '2.0',
-    id: 1,
-    method,
-    params,
+// Make CDP API request
+async function requestFaucet(address, network, token) {
+  const net = NETWORKS[network];
+  if (!net) {
+    throw new Error(`Unsupported network: ${network}`);
+  }
+
+  const url = 'https://api.cdp.coinbase.com/wallet/v1/faucet/request';
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${CDP_API_KEY}`,
+    },
+    body: JSON.stringify({
+      address,
+      network: net.network,
+      token,
+    }),
   });
-  return response.data;
+
+  const data = await response.json();
+  
+  if (!response.ok) {
+    throw new Error(data.message || `HTTP ${response.status}`);
+  }
+  
+  return data;
 }
 
 // Routes
 app.post('/airdrop', async (req, res) => {
-  const { address, network = 'devnet' } = req.body;
+  const { address, network = 'base-sepolia', token = 'eth' } = req.body;
+  
+  console.log(`[AIRDROP] request: address=${address}, network=${network}, token=${token}`);
 
-  // Validate address
-  if (!isValidSolanaAddress(address)) {
+  // Validate inputs
+  const net = NETWORKS[network];
+  if (!net) {
     return res.json({
       success: false,
-      message: 'Invalid Solana address',
+      message: `Invalid network. Supported: ${Object.keys(NETWORKS).join(', ')}`,
       lamports: 0,
     });
   }
 
-  // Check rate limit
+  if (!TOKENS.includes(token)) {
+    return res.json({
+      success: false,
+      message: `Invalid token. Supported: ${TOKENS.join(', ')}`,
+      lamports: 0,
+    });
+  }
+
+  if (!validateAddress(address, net.chain)) {
+    return res.json({
+      success: false,
+      message: `Invalid ${net.chain === 'sol' ? 'Solana' : 'EVM'} address`,
+      lamports: 0,
+    });
+  }
+
+  // Check rate limit (local)
   const now = Date.now();
-  const lastClaim = rateLimit.get(address);
+  const key = `${address}:${network}:${token}`;
+  const lastClaim = rateLimit.get(key);
   if (lastClaim) {
     const elapsed = (now - lastClaim) / 1000;
     if (elapsed < RATE_LIMIT_SECS) {
@@ -67,58 +125,57 @@ app.post('/airdrop', async (req, res) => {
     }
   }
 
-  try {
-    const result = await solanaRpc('requestAirdrop', [address, AIRDROP_LAMPORTS], network);
-    
-    if (result.error) {
-      return res.json({
-        success: false,
-        message: `RPC Error: ${result.error.message}`,
-        lamports: 0,
-      });
-    }
+  // Check if CDP API key is configured
+  if (!CDP_API_KEY) {
+    return res.json({
+      success: false,
+      message: 'CDP_API_KEY not configured. Set it in environment variables.',
+      lamports: 0,
+    });
+  }
 
-    rateLimit.set(address, now);
-    const sol = AIRDROP_LAMPORTS / 1e9;
+  try {
+    const result = await requestFaucet(address, network, token);
+    
+    rateLimit.set(key, now);
     
     res.json({
       success: true,
-      tx_signature: result.result,
-      message: `Airdropped ${sol} SOL to ${address}`,
-      lamports: AIRDROP_LAMPORTS,
+      tx_hash: result.tx_hash || result.transactionHash || 'pending',
+      message: `Airdropped ${TOKEN_LIMITS[token].amount} to ${address} on ${network}`,
+      network,
+      token,
     });
   } catch (error) {
+    console.log(`[ERROR] ${error.message}`);
     res.json({
       success: false,
-      message: `Request failed: ${error.message}`,
+      message: error.message,
       lamports: 0,
     });
   }
 });
 
-app.get('/status', async (req, res) => {
-  try {
-    const [slot, version] = await Promise.all([
-      solanaRpc('getSlot', []),
-      solanaRpc('getVersion', []),
-    ]);
-    
-    res.json({
-      network: 'devnet',
-      slot: slot.result || 0,
-      version: version.result?.solanaCore || 'unknown',
-    });
-  } catch (error) {
-    res.json({
-      network: 'devnet',
-      slot: 0,
-      version: 'error',
-    });
-  }
+app.get('/networks', (req, res) => {
+  res.json({
+    networks: Object.keys(NETWORKS),
+    tokens: TOKENS,
+    limits: TOKEN_LIMITS,
+  });
+});
+
+app.get('/status', (req, res) => {
+  res.json({
+    cdp_configured: !!CDP_API_KEY,
+    network: 'online',
+    supported_networks: Object.keys(NETWORKS),
+  });
 });
 
 app.listen(PORT, () => {
   console.log(`🦞 Avi Faucet running on http://0.0.0.0:${PORT}`);
-  console.log(`   Airdrop: ${AIRDROP_LAMPORTS / 1e9} SOL`);
+  console.log(`   Networks: ${Object.keys(NETWORKS).join(', ')}`);
+  console.log(`   Tokens: ${TOKENS.join(', ')}`);
   console.log(`   Rate limit: ${RATE_LIMIT_SECS} seconds`);
+  console.log(`   CDP API: ${CDP_API_KEY ? 'configured' : 'NOT CONFIGURED'}`);
 });
