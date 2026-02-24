@@ -36,25 +36,47 @@ async function airdropRpc(address, rpcUrl, amount) {
   }
 }
 
-// devnetfaucet.org API airdrop
-async function airdropFaucetOrg(address, amount) {
+// faucet.solana.com API airdrop
+async function airdropFaucetSolanaCom(address, amount) {
   try {
-    // Convert SOL to lamports
     const lamports = Math.floor(amount * 1e9);
-    const response = await axios.post('https://faucet-server.v1.devnet.solana.com/', {
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'requestAirdrop',
-      params: [address, lamports],
+    const response = await axios.post('https://faucet-server.v1.devnet.solana.com/api/airdrop', {
+      address: address,
+      lamports: lamports,
     }, {
       validateStatus: s => s < 500,
       timeout: 30000,
     });
     
     if (response.data.error) {
-      return { success: false, error: response.data.error.message };
+      return { success: false, error: response.data.error.message || response.data.error };
     }
-    return { success: true, signature: response.data.result };
+    return { success: true, signature: response.data.signature };
+  } catch (e) {
+    // Fallback to RPC method
+    const lamports = Math.floor(amount * 1e9);
+    return await airdropRpc(address, 'https://api.devnet.solana.com', lamports);
+  }
+}
+
+// devnetfaucet.org API airdrop
+async function airdropDevnetFaucet(address, amount) {
+  try {
+    const response = await axios.post('https://api.devnetfaucet.org/v1/airdrop', {
+      address: address,
+      amount: amount,
+    }, {
+      validateStatus: s => s < 500,
+      timeout: 30000,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (response.data.error) {
+      return { success: false, error: response.data.error.message || response.data.error };
+    }
+    return { success: true, signature: response.data.signature || response.data.result };
   } catch (e) {
     return { success: false, error: e.message };
   }
@@ -68,53 +90,6 @@ function airdropCli(address, rpc, amount) {
     const cmd = `solana airdrop ${amount / 1e9} ${address}${rpcArg}`;
     execSync(cmd, { encoding: 'utf8' });
     return { success: true };
-  } catch (e) {
-    return { success: false, error: e.message };
-  }
-}
-
-// PoW faucet - check if available and run
-async function airdropPow(address) {
-  const { execSync, spawn } = require('child_process');
-  
-  // Check if devnet-pow is installed (try both PATH and ~/.cargo/bin)
-  let powPath = 'devnet-pow';
-  try {
-    execSync('which devnet-pow', { encoding: 'utf8' });
-  } catch (e) {
-    // Try ~/.cargo/bin
-    try {
-      execSync('test -x ~/.cargo/bin/devnet-pow', { encoding: 'utf8' });
-      powPath = process.env.HOME + '/.cargo/bin/devnet-pow';
-    } catch (e2) {
-      return { 
-        success: false, 
-        error: 'devnet-pow not installed. Install with: cargo install devnet-pow',
-        installHint: true
-      };
-    }
-  }
-  
-  // Run devnet-pow
-  // Note: PoW mines to a newly generated keypair, not directly to an address
-  try {
-    console.log('⛏️  Starting PoW mining (this generates a new keypair)...');
-    console.log('   Note: SOL will be mined to a new keypair, not the provided address.');
-    console.log('   After mining, you can transfer SOL from the generated keypair.\n');
-    
-    const proc = spawn(powPath, ['mine', '--target-lamports', '10000000000'], {
-      stdio: 'inherit'
-    });
-    
-    return new Promise((resolve) => {
-      proc.on('close', (code) => {
-        if (code === 0) {
-          resolve({ success: true, note: 'PoW mining completed. Check terminal for generated keypair info.' });
-        } else {
-          resolve({ success: false, error: `PoW process exited with code ${code}` });
-        }
-      });
-    });
   } catch (e) {
     return { success: false, error: e.message };
   }
@@ -166,7 +141,7 @@ const argv = yargs
   })
   .option('method', {
     alias: 'x',
-    description: 'Method: rpc, cli, pow, faucet',
+    description: 'Method: rpc, faucet, devnet (faucet.solana.com or devnetfaucet.org)',
     default: 'rpc',
     type: 'string',
   })
@@ -195,7 +170,8 @@ async function main() {
     console.log('\n💡 Examples:');
     console.log('   avi-faucet -a <ADDRESS>                    # RPC airdrop');
     console.log('   avi-faucet -a <ADDRESS> -H YOUR_KEY       # Helius RPC');
-    console.log('   avi-faucet -a <ADDRESS> -x pow              # PoW mining');
+    console.log('   avi-faucet -a <ADDRESS> -x faucet          # faucet.solana.com');
+    console.log('   avi-faucet -a <ADDRESS> -x devnet          # devnetfaucet.org');
     console.log('   avi-faucet -b -a <ADDRESS>                 # Check balance');
     process.exit(0);
   }
@@ -256,13 +232,9 @@ async function main() {
       console.log('📝 Using Solana CLI...');
       result = airdropCli(address, rpcUrl, lamports);
       break;
-    case 'pow':
-      console.log('⛏️  Using PoW faucet...');
-      result = await airdropPow(address);
-      break;
     case 'faucet':
       console.log('🌊 Using faucet.solana.com...');
-      result = await airdropFaucetOrg(address, amount);
+      result = await airdropFaucetSolanaCom(address, amount);
       break;
     default:
       console.log('🌐 Using RPC...');

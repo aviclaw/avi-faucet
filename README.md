@@ -1,6 +1,6 @@
 # avi-faucet 🦞
 
-CLI for Solana devnet/testnet faucets — direct RPC, CLI, and PoW methods.
+CLI for Solana devnet/testnet faucets — RPC, Helius, and faucet.solana.com.
 
 ## Install
 
@@ -44,23 +44,15 @@ avi-faucet -a <ADDRESS> -H true
 #### 3. Solana CLI
 ```bash
 # Requires Solana CLI installed
-avi-faucet -a <ADDRESS> --method cli
+avi-faucet -a <ADDRESS> -x cli
 ```
 
-#### 4. PoW Faucet (no rate limits!)
+#### 4. faucet.solana.com (2 requests/8hrs)
 ```bash
-# Install dependencies:
-cargo install devnet-pow
-sh -c "$(curl -sSfL https://release.solana.com/v1.18.26/install)"  # Solana CLI
-
-# Configure Solana CLI:
-solana config set --url https://api.devnet.solana.com
-
-# Then mine SOL (generates new keypair):
-avi-faucet -a <ADDRESS> --method pow
+avi-faucet -a <ADDRESS> -x faucet
 ```
 
-> **Note**: PoW mining generates a new keypair and mines SOL to it. After mining completes, transfer SOL to your target address.
+> Note: faucet.solana.com falls back to RPC if the web faucet is unavailable.
 
 ## Options
 
@@ -72,7 +64,7 @@ avi-faucet -a <ADDRESS> --method pow
 | `--rpc` | `-r` | (auto) | Custom RPC URL |
 | `--helius` | `-H` | - | Helius API key |
 | `--amount` | `-m` | 5 | Amount in SOL |
-| `--method` | `-x` | rpc | Method: rpc, cli, pow |
+| `--method` | `-x` | rpc | Method: rpc, faucet, cli |
 
 ## Rate Limits
 
@@ -82,7 +74,7 @@ avi-faucet -a <ADDRESS> --method pow
 | Helius (free) | 1 SOL/day |
 | Helius (paid) | Varies |
 | Solana CLI | Uses RPC rate limits |
-| PoW | **No limits!** |
+| faucet.solana.com | 2 requests/8 hours |
 
 ## Environment Variables
 

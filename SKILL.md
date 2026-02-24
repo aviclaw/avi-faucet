@@ -1,19 +1,17 @@
 # avi-faucet
 
-CLI tool for Solana devnet/testnet faucets - direct RPC, CLI, and PoW methods.
+CLI tool for Solana devnet/testnet faucets - RPC, Helius, and faucet.solana.com.
 
 ## Description
 
 Zero-friction Solana faucet for agents. Multiple methods:
 - **RPC**: Direct requestAirdrop() calls
-- **CLI**: Solana CLI airdrop
-- **PoW**: CPU mining via devnet-pow
+- **Helius**: Free tier (1 SOL/day) or paid
+- **faucet.solana.com**: Web faucet (2 requests/8 hours), falls back to RPC
 
 ## Requirements
 
 - Node.js 18+
-- (Optional) Solana CLI for CLI method
-- (Optional) Rust + Cargo for PoW method
 
 ## Installation
 
@@ -59,23 +57,12 @@ avi-faucet --address <ADDR> --method cli
 avi-faucet -a <ADDR> -x cli
 ```
 
-### PoW Faucet
+### faucet.solana.com
 
 ```bash
-# Install dependencies
-cargo install devnet-pow
-sh -c "$(curl -sSfL https://release.solana.com/v1.18.26/install)"
-
-# Configure Solana CLI
-solana config set --url https://api.devnet.solana.com
-
-# Mine SOL via faucet (generates new keypair)
-avi-faucet --address <ADDR> --method pow
-# or directly:
-devnet-pow mine
+avi-faucet --address <ADDR> --method faucet
+avi-faucet -a <ADDR> -x faucet
 ```
-
-> **Note**: PoW mining generates a new keypair and mines SOL to it. After mining completes, transfer SOL to your target address using `solana transfer`.
 
 ## Options
 
@@ -86,7 +73,7 @@ devnet-pow mine
 | `--rpc` | `-r` | (auto) | Custom RPC URL |
 | `--helius` | `-H` | - | Helius API key |
 | `--amount` | `-m` | 5 | Amount in SOL |
-| `--method` | `-x` | rpc | Method: rpc, cli, pow |
+| `--method` | `-x` | rpc | Method: rpc, faucet, cli |
 
 ## Rate Limits
 
@@ -96,7 +83,7 @@ devnet-pow mine
 | Helius (free tier) | 1 SOL/day |
 | Helius (paid) | Varies |
 | Solana CLI | Uses RPC rate limits |
-| PoW | No limits |
+| faucet.solana.com | 2 requests/8 hours |
 
 ## For Agents
 
