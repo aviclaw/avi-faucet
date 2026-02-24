@@ -1,6 +1,6 @@
 # avi-faucet 🦞
 
-CLI for Solana devnet/testnet faucets — direct RPC, CLI, and PoW.
+CLI for Solana devnet/testnet faucets — direct RPC, CLI, and PoW methods.
 
 ## Install
 
@@ -8,36 +8,52 @@ CLI for Solana devnet/testnet faucets — direct RPC, CLI, and PoW.
 npm install -g aviclaw/avi-faucet
 ```
 
+Or run directly:
+```bash
+npx aviclaw/avi-faucet --address <ADDR>
+```
+
 ## Usage
 
-### Direct RPC (default)
+### Quick Start
+
 ```bash
-avi-faucet --address <ADDRESS> --network devnet
-avi-faucet -a <ADDRESS> -n devnet
+# Check balance
+avi-faucet -b -a <ADDRESS>
+
+# Request airdrop (default: RPC)
+avi-faucet -a <ADDRESS>
 ```
 
-### With custom RPC
+### Methods
+
+#### 1. Direct RPC (default)
 ```bash
-avi-faucet --address <ADDRESS> --rpc https://api.devnet.solana.com
-avi-faucet -a <ADDRESS> -r https://api.devnet.solana.com
+avi-faucet -a <ADDRESS>
 ```
 
-### Helius RPC (recommended)
+#### 2. Helius RPC (recommended)
 ```bash
-avi-faucet --address <ADDRESS> --helius YOUR_API_KEY
+# With API key
 avi-faucet -a <ADDRESS> -H YOUR_API_KEY
+
+# From environment variable
+avi-faucet -a <ADDRESS> -H true
 ```
 
-### Solana CLI
+#### 3. Solana CLI
 ```bash
-avi-faucet --address <ADDRESS> --method cli
-avi-faucet -a <ADDRESS> -x cli
+# Requires Solana CLI installed
+avi-faucet -a <ADDRESS> --method cli
 ```
 
-### PoW Faucet
+#### 4. PoW Faucet (no rate limits!)
 ```bash
-# Install: cargo install devnet-pow
-devnet-pow mine --to <ADDRESS>
+# First install devnet-pow:
+cargo install devnet-pow
+
+# Then mine SOL:
+avi-faucet -a <ADDRESS> --method pow
 ```
 
 ## Options
@@ -45,57 +61,60 @@ devnet-pow mine --to <ADDRESS>
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--address` | `-a` | (required) | Solana address |
+| `--balance` | `-b` | false | Check balance only |
 | `--network` | `-n` | devnet | Network: devnet, testnet |
 | `--rpc` | `-r` | (auto) | Custom RPC URL |
 | `--helius` | `-H` | - | Helius API key |
 | `--amount` | `-m` | 5 | Amount in SOL |
 | `--method` | `-x` | rpc | Method: rpc, cli, pow |
 
-## Examples
-
-```bash
-# Basic airdrop
-avi-faucet -a 7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU
-
-# Helius (faster, more reliable)
-avi-faucet -a <ADDRESS> -H YOUR_HELIUS_KEY
-
-# Custom RPC
-avi-faucet -a <ADDRESS> -r https://api.devnet.solana.com
-
-# Solana CLI
-avi-faucet -a <ADDRESS> -x cli
-```
-
 ## Rate Limits
 
-- **Solana public RPC**: ~5 SOL/day, rate limited
-- **Helius**: 1 SOL/day (free tier)
-- **Custom RPC**: Depends on provider
+| Method | Limit |
+|--------|-------|
+| Solana public RPC | ~5 SOL/day |
+| Helius (free) | 1 SOL/day |
+| Helius (paid) | Varies |
+| Solana CLI | Uses RPC rate limits |
+| PoW | **No limits!** |
 
-## Methods
+## Environment Variables
 
-### RPC (default)
-Uses `requestAirdrop` RPC call. Simple but rate-limited.
-
-### CLI
-Uses `solana airdrop` CLI. Requires Solana CLI installed.
-
-### PoW
-Uses CPU mining via `devnet-pow`. No rate limits.
 ```bash
-cargo install devnet-pow
-devnet-pow mine --to <ADDRESS>
+# For Helius
+export HELIUS_API_KEY="your-key"
+
+# Then use:
+avi-faucet -a <ADDRESS> -H true
 ```
 
 ## For Agents
 
-This tool is designed for autonomous agents. Use programmatically:
+Use programmatically:
 
 ```javascript
 const { execSync } = require('child_process');
 
-const address = '...';
-const result = execSync(`avi-faucet -a ${address}`, { encoding: 'utf8' });
-console.log(result);
+function requestAirdrop(address, options = {}) {
+  const args = ['-a', address];
+  if (options.helius) args.push('-H', options.helius);
+  if (options.amount) args.push('-m', options.amount);
+  
+  const result = execSync(`avi-faucet ${args.join(' ')}`, { encoding: 'utf8' });
+  return result;
+}
+
+// Example
+requestAirdrop('7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU', { helius: 'YOUR_KEY' });
 ```
+
+## Security Notes
+
+- Never commit API keys
+- Use environment variables for secrets
+- Rate limits protect from abuse
+- Solana addresses validated before sending
+
+## License
+
+MIT

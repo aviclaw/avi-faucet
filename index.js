@@ -39,8 +39,9 @@ async function airdropRpc(address, rpcUrl, amount) {
 // Solana CLI airdrop
 function airdropCli(address, rpc, amount) {
   const { execSync } = require('child_process');
+  const rpcArg = rpc ? ` -u "${rpc}"` : '';
   try {
-    const cmd = `solana airdrop ${amount / 1e9} ${address}${rpc ? ` -u "${rpc}"' : ''}`;
+    const cmd = `solana airdrop ${amount / 1e9} ${address}${rpcArg}`;
     execSync(cmd, { encoding: 'utf8' });
     return { success: true };
   } catch (e) {
@@ -48,10 +49,61 @@ function airdropCli(address, rpc, amount) {
   }
 }
 
-// PoW faucet
+// PoW faucet - check if available and run
 async function airdropPow(address) {
-  // Would use devnet-pow tool - placeholder for now
-  return { success: false, error: 'PoW faucet: run `devnet-pow mine --to ${address}`' };
+  const { execSync, spawn } = require('child_process');
+  
+  // Check if devnet-pow is installed
+  try {
+    execSync('which devnet-pow', { encoding: 'utf8' });
+  } catch (e) {
+    return { 
+      success: false, 
+      error: 'devnet-pow not installed. Install with: cargo install devnet-pow',
+      installHint: true
+    };
+  }
+  
+  // Run devnet-pow
+  try {
+    console.log('⛏️  Starting PoW mining...');
+    const proc = spawn('devnet-pow', ['mine', '--to', address], {
+      stdio: 'inherit'
+    });
+    
+    return new Promise((resolve) => {
+      proc.on('close', (code) => {
+        if (code === 0) {
+          resolve({ success: true });
+        } else {
+          resolve({ success: false, error: `PoW process exited with code ${code}` });
+        }
+      });
+    });
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+// Check balance
+async function checkBalance(address, rpcUrl) {
+  try {
+    const response = await axios.post(rpcUrl, {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'getBalance',
+      params: [address],
+    }, {
+      validateStatus: s => s < 500,
+    });
+    
+    if (response.data.error) {
+      return null;
+    }
+    return response.data.result?.value || 0;
+  } catch (e) {
+    return null;
+  }
 }
 
 const argv = yargs
@@ -59,7 +111,6 @@ const argv = yargs
     alias: 'a',
     description: 'Solana address to receive airdrop',
     type: 'string',
-    demandOption: true,
   })
   .option('rpc', {
     alias: 'r',
@@ -80,14 +131,20 @@ const argv = yargs
   })
   .option('method', {
     alias: 'x',
-    description: 'Method: rpc, cli, or pow',
+    description: 'Method: rpc, cli, pow',
     default: 'rpc',
     type: 'string',
   })
   .option('helius', {
     alias: 'H',
-    description: 'Use Helius RPC (requires API key)',
+    description: 'Use Helius RPC (provide API key or true for env var)',
     type: 'string',
+  })
+  .option('balance', {
+    alias: 'b',
+    description: 'Check balance only',
+    type: 'boolean',
+    default: false,
   })
   .help()
   .alias('help', 'h')
@@ -95,20 +152,59 @@ const argv = yargs
 
 // Main
 async function main() {
-  const { address, rpc, network, amount, method, helius } = argv;
+  let { address, rpc, network, amount, method, helius, balance } = argv;
   
+  // If no address provided, show help
+  if (!address && !balance) {
+    yargs.showHelp();
+    console.log('\n💡 Examples:');
+    console.log('   avi-faucet -a <ADDRESS>                    # RPC airdrop');
+    console.log('   avi-faucet -a <ADDRESS> -H YOUR_KEY       # Helius RPC');
+    console.log('   avi-faucet -a <ADDRESS> -x pow              # PoW mining');
+    console.log('   avi-faucet -b -a <ADDRESS>                 # Check balance');
+    process.exit(0);
+  }
+  
+  // Determine RPC URL
+  let rpcUrl = rpc || NETWORKS[network];
+  
+  // Handle helius flag
+  if (helius) {
+    // If helius is 'true', try to get from env
+    let heliusKey = helius;
+    if (helius === 'true') {
+      heliusKey = process.env.HELIUS_API_KEY;
+    }
+    if (!heliusKey) {
+      console.error('Error: Helius API key required. Provide via -H or set HELIUS_API_KEY env var');
+      process.exit(1);
+    }
+    rpcUrl = `https://devnet.helius-rpc.com/?api-key=${heliusKey}`;
+  }
+  
+  // Check balance mode
+  if (balance) {
+    if (!address) {
+      console.error('Error: --balance requires --address');
+      process.exit(1);
+    }
+    console.log(`🔍 Checking balance for ${address}...`);
+    const bal = await checkBalance(address, rpcUrl);
+    if (bal !== null) {
+      console.log(`   Balance: ${bal / 1e9} SOL`);
+    } else {
+      console.log('   Error fetching balance');
+    }
+    return;
+  }
+  
+  // Validate address
   if (!isValidAddress(address)) {
     console.error('Error: Invalid Solana address');
     process.exit(1);
   }
   
   const lamports = amount * 1e9;
-  
-  // Determine RPC
-  let rpcUrl = rpc || NETWORKS[network];
-  if (helius) {
-    rpcUrl = `https://devnet.helius-rpc.com/?api-key=${helius}`;
-  }
   
   console.log(`🦞 Avi Faucet`);
   console.log(`   Address: ${address}`);
@@ -122,12 +218,15 @@ async function main() {
   
   switch (method) {
     case 'cli':
+      console.log('📝 Using Solana CLI...');
       result = airdropCli(address, rpcUrl, lamports);
       break;
     case 'pow':
+      console.log('⛏️  Using PoW faucet...');
       result = await airdropPow(address);
       break;
     default:
+      console.log('🌐 Using RPC...');
       result = await airdropRpc(address, rpcUrl, lamports);
   }
   
@@ -138,6 +237,10 @@ async function main() {
     }
   } else {
     console.log(`❌ Failed: ${result.error}`);
+    if (result.installHint) {
+      console.log('\n💡 To install devnet-pow:');
+      console.log('   cargo install devnet-pow');
+    }
     process.exit(1);
   }
 }
