@@ -36,6 +36,30 @@ async function airdropRpc(address, rpcUrl, amount) {
   }
 }
 
+// devnetfaucet.org API airdrop
+async function airdropFaucetOrg(address, amount) {
+  try {
+    // Convert SOL to lamports
+    const lamports = Math.floor(amount * 1e9);
+    const response = await axios.post('https://faucet-server.v1.devnet.solana.com/', {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'requestAirdrop',
+      params: [address, lamports],
+    }, {
+      validateStatus: s => s < 500,
+      timeout: 30000,
+    });
+    
+    if (response.data.error) {
+      return { success: false, error: response.data.error.message };
+    }
+    return { success: true, signature: response.data.result };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
 // Solana CLI airdrop
 function airdropCli(address, rpc, amount) {
   const { execSync } = require('child_process');
@@ -142,7 +166,7 @@ const argv = yargs
   })
   .option('method', {
     alias: 'x',
-    description: 'Method: rpc, cli, pow',
+    description: 'Method: rpc, cli, pow, faucet',
     default: 'rpc',
     type: 'string',
   })
@@ -235,6 +259,10 @@ async function main() {
     case 'pow':
       console.log('⛏️  Using PoW faucet...');
       result = await airdropPow(address);
+      break;
+    case 'faucet':
+      console.log('🌊 Using faucet.solana.com...');
+      result = await airdropFaucetOrg(address, amount);
       break;
     default:
       console.log('🌐 Using RPC...');
