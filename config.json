@@ -1,0 +1,7 @@
+{
+  "name": "avi-faucet",
+  "version": "1.0.0",
+  "description": "CLI for Solana devnet/testnet faucets - RPC, CLI, PoW",
+  "entry": "index.js",
+  "keywords": ["solana", "faucet", "airdrop", "devnet", "cli", "agent"]
+}
