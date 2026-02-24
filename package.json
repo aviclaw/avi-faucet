@@ -1,0 +1,18 @@
+{
+  "name": "avi-faucet",
+  "version": "1.0.0",
+  "description": "CLI for Solana devnet/testnet faucets - direct RPC, CLI, and PoW",
+  "bin": {
+    "avi-faucet": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": ["solana", "faucet", "airdrop", "devnet", "cli", "agent"],
+  "author": "avi",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.0",
+    "yargs": "^17.7.0"
+  }
+}
