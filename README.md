@@ -49,12 +49,18 @@ avi-faucet -a <ADDRESS> --method cli
 
 #### 4. PoW Faucet (no rate limits!)
 ```bash
-# First install devnet-pow:
+# Install dependencies:
 cargo install devnet-pow
+sh -c "$(curl -sSfL https://release.solana.com/v1.18.26/install)"  # Solana CLI
 
-# Then mine SOL:
+# Configure Solana CLI:
+solana config set --url https://api.devnet.solana.com
+
+# Then mine SOL (generates new keypair):
 avi-faucet -a <ADDRESS> --method pow
 ```
+
+> **Note**: PoW mining generates a new keypair and mines SOL to it. After mining completes, transfer SOL to your target address.
 
 ## Options
 

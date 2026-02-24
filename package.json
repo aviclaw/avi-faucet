@@ -8,11 +8,20 @@
   "scripts": {
     "start": "node index.js"
   },
-  "keywords": ["solana", "faucet", "airdrop", "devnet", "cli", "agent"],
+  "keywords": [
+    "solana",
+    "faucet",
+    "airdrop",
+    "devnet",
+    "cli",
+    "agent"
+  ],
   "author": "avi",
   "license": "MIT",
   "dependencies": {
+    "@solana/web3.js": "^1.98.4",
     "axios": "^1.7.0",
+    "bs58": "^6.0.0",
     "yargs": "^17.7.0"
   }
 }

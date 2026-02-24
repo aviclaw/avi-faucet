@@ -53,28 +53,39 @@ function airdropCli(address, rpc, amount) {
 async function airdropPow(address) {
   const { execSync, spawn } = require('child_process');
   
-  // Check if devnet-pow is installed
+  // Check if devnet-pow is installed (try both PATH and ~/.cargo/bin)
+  let powPath = 'devnet-pow';
   try {
     execSync('which devnet-pow', { encoding: 'utf8' });
   } catch (e) {
-    return { 
-      success: false, 
-      error: 'devnet-pow not installed. Install with: cargo install devnet-pow',
-      installHint: true
-    };
+    // Try ~/.cargo/bin
+    try {
+      execSync('test -x ~/.cargo/bin/devnet-pow', { encoding: 'utf8' });
+      powPath = process.env.HOME + '/.cargo/bin/devnet-pow';
+    } catch (e2) {
+      return { 
+        success: false, 
+        error: 'devnet-pow not installed. Install with: cargo install devnet-pow',
+        installHint: true
+      };
+    }
   }
   
   // Run devnet-pow
+  // Note: PoW mines to a newly generated keypair, not directly to an address
   try {
-    console.log('⛏️  Starting PoW mining...');
-    const proc = spawn('devnet-pow', ['mine', '--to', address], {
+    console.log('⛏️  Starting PoW mining (this generates a new keypair)...');
+    console.log('   Note: SOL will be mined to a new keypair, not the provided address.');
+    console.log('   After mining, you can transfer SOL from the generated keypair.\n');
+    
+    const proc = spawn(powPath, ['mine', '--target-lamports', '10000000000'], {
       stdio: 'inherit'
     });
     
     return new Promise((resolve) => {
       proc.on('close', (code) => {
         if (code === 0) {
-          resolve({ success: true });
+          resolve({ success: true, note: 'PoW mining completed. Check terminal for generated keypair info.' });
         } else {
           resolve({ success: false, error: `PoW process exited with code ${code}` });
         }
