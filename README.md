@@ -76,6 +76,15 @@ avi-faucet -a <ADDRESS> -x faucet
 | Solana CLI | Uses RPC rate limits |
 | faucet.solana.com | 2 requests/8 hours |
 
+## Alternative Faucets (Web UI)
+
+If CLI fails, try these web faucets:
+
+- **Quicknode**: https://faucet.quicknode.com/solana/devnet (0.05 SOL/12hrs)
+- **Jumpbit**: https://jumpbit.io/en/solana/devnet-faucet (up to 2 SOL)
+- **SolFaucet**: https://solfaucet.com (1 SOL)
+- **Local Validator**: No limits - run `solana-test-validator` locally
+
 ## Environment Variables
 
 ```bash

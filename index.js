@@ -59,6 +59,18 @@ async function airdropFaucetSolanaCom(address, amount) {
   }
 }
 
+// Quicknode faucet
+async function airdropQuicknode(address, amount) {
+  try {
+    // Quicknode requires wallet connection, fallback to RPC
+    // Users should use https://faucet.quicknode.com/solana/devnet directly
+    console.log('   → Use web UI: https://faucet.quicknode.com/solana/devnet');
+    return { success: false, error: 'Use web UI: https://faucet.quicknode.com/solana/devnet' };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
 // devnetfaucet.org API airdrop
 async function airdropDevnetFaucet(address, amount) {
   try {
